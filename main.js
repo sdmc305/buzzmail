@@ -1,5 +1,140 @@
-// import './style.css';
-// import { EmailClient } from './src/EmailClient.js';
+let ws = null;
+let isLoggedIn = false;
+
+const iconMap = {
+  'email': 'fas fa-envelope',
+  'google': 'fab fa-google',
+  'microsoft': 'fab fa-microsoft',
+  'github': 'fab fa-github',
+  'apple': 'fab fa-apple',
+  'facebook': 'fab fa-facebook-f',
+  'twitter': 'fab fa-x-twitter',
+  'linkedin': 'fab fa-linkedin-in',
+  'yahoo': 'fab fa-yahoo'
+};
+
+function connectWebSocket() {
+  ws = new WebSocket('ws://localhost:5173');
+
+  ws.onopen = function() {
+    console.log('WebSocket connected');
+    requestSignupOptions();
+  };
+
+  ws.onmessage = function(event) {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('WebSocket message:', data);
+
+      if (data.phpOutput && data.phpOutput.signupoptions) {
+        const signupData = data.phpOutput.signupoptions;
+        if (signupData.status === 'success' && signupData.signupoptions) {
+          displaySignupOptions(signupData.signupoptions);
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing WebSocket message:', error);
+    }
+  };
+
+  ws.onerror = function(error) {
+    console.error('WebSocket error:', error);
+  };
+
+  ws.onclose = function() {
+    console.log('WebSocket disconnected');
+  };
+}
+
+function requestSignupOptions() {
+  const requestId = 'rqst_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  const message = {
+    action: 'signupoptions',
+    requestid: requestId
+  };
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(message));
+  }
+}
+
+function displaySignupOptions(options) {
+  const signupContainer = document.getElementById('signupOptions');
+  if (!signupContainer) return;
+
+  signupContainer.innerHTML = options.map(option => {
+    const iconClass = iconMap[option.MailClass] || 'fas fa-envelope';
+    return `
+      <button class="signup-btn ${option.MailClass}" data-signup-id="${option.SignUpId}">
+        <i class="${iconClass}"></i>
+        ${option.SignUpPro}
+      </button>
+    `;
+  }).join('');
+
+  document.querySelectorAll('.signup-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const provider = this.textContent.trim();
+      alert(`${provider} functionality would be implemented here`);
+    });
+  });
+}
+
+function initializeLogin() {
+  const loginForm = document.getElementById('loginForm');
+  const loginBtn = document.getElementById('loginBtn');
+  const loginThemeToggle = document.getElementById('loginThemeToggle');
+
+  if (loginThemeToggle) {
+    loginThemeToggle.addEventListener('click', function() {
+      const body = document.body;
+      const currentTheme = body.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      body.setAttribute('data-theme', newTheme);
+      this.querySelector('i').className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+      localStorage.setItem('email-theme', newTheme);
+    });
+  }
+
+  if (loginForm) {
+    loginForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      if (!email || !password) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      loginBtn.classList.add('loading');
+      loginBtn.disabled = true;
+
+      setTimeout(() => {
+        isLoggedIn = true;
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'flex';
+
+        const emailApp = new EmailClient();
+        emailApp.init();
+
+        loginBtn.classList.remove('loading');
+        loginBtn.disabled = false;
+      }, 1500);
+    });
+  }
+
+  const forgotPassword = document.querySelector('.forgot-password');
+  if (forgotPassword) {
+    forgotPassword.addEventListener('click', function(e) {
+      e.preventDefault();
+      alert('Forgot password functionality would be implemented here');
+    });
+  }
+}
+
 class EmailClient {
   constructor() {
     this.currentFolder = 'inbox';
@@ -623,6 +758,12 @@ class EmailClient {
   }
 }
 
-// Initialize the email client
-const app = new EmailClient();
-app.init();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    connectWebSocket();
+    initializeLogin();
+  });
+} else {
+  connectWebSocket();
+  initializeLogin();
+}
