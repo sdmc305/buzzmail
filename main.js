@@ -14,7 +14,7 @@ class EmailClient {
       'github': 'fab fa-github',
       'apple': 'fab fa-apple',
       'facebook': 'fab fa-facebook-f',
-      'twitter': 'fab fa-x-twitter',
+      'twitter': 'fab fa-twitter',
       'linkedin': 'fab fa-linkedin-in',
       'yahoo': 'fab fa-yahoo'
     };
