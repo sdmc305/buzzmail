@@ -128,10 +128,15 @@ class EmailClient {
 
         setTimeout(() => {
           this.isLoggedIn = true;
+          this.userLoginEmail = email;
           document.getElementById('loginScreen').style.display = 'none';
           document.getElementById('app').style.display = 'flex';
 
           this.init();
+
+          if (this.elements.userEmail) {
+            this.elements.userEmail.textContent = email;
+          }
 
           loginBtn.classList.remove('loading');
           loginBtn.disabled = false;
@@ -182,7 +187,13 @@ class EmailClient {
       draftsBadge: document.getElementById('draftsBadge'),
       composeTo: document.getElementById('composeTo'),
       composeSubject: document.getElementById('composeSubject'),
-      composeMessage: document.getElementById('composeMessage')
+      composeMessage: document.getElementById('composeMessage'),
+      userAvatar: document.getElementById('userAvatar'),
+      userDropdown: document.getElementById('userDropdown'),
+      closeUserDropdown: document.getElementById('closeUserDropdown'),
+      logoutBtn: document.getElementById('logoutBtn'),
+      signOutBtn: document.getElementById('signOutBtn'),
+      userEmail: document.getElementById('userEmail')
     };
   }
 
@@ -220,6 +231,20 @@ class EmailClient {
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+
+    // User dropdown
+    this.elements.userAvatar?.addEventListener('click', () => this.toggleUserDropdown());
+    this.elements.closeUserDropdown?.addEventListener('click', () => this.closeUserDropdown());
+    this.elements.logoutBtn?.addEventListener('click', () => this.logout());
+    this.elements.signOutBtn?.addEventListener('click', () => this.logout());
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (this.elements.userDropdown?.classList.contains('active') &&
+          !e.target.closest('.user-menu-container')) {
+        this.closeUserDropdown();
+      }
+    });
   }
 
   generateSampleEmails() {
@@ -757,6 +782,25 @@ class EmailClient {
         document.body.removeChild(toast);
       }, 300);
     }, 3000);
+  }
+
+  toggleUserDropdown() {
+    this.elements.userDropdown?.classList.toggle('active');
+  }
+
+  closeUserDropdown() {
+    this.elements.userDropdown?.classList.remove('active');
+  }
+
+  logout() {
+    this.closeUserDropdown();
+    this.isLoggedIn = false;
+
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
   }
 }
 
