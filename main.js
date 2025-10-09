@@ -118,10 +118,10 @@ class EmailClient {
         const email = document.getElementById('loginEmail').value;
         const password = document.getElementById('loginPassword').value;
 
-        if (!email || !password) {
-          alert('Please fill in all fields');
-          return;
-        }
+        // if (!email || !password) {
+          // alert('Please fill in all fields');
+          // return;
+        // }
 
         loginBtn.classList.add('loading');
         loginBtn.disabled = true;
