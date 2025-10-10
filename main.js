@@ -6,6 +6,10 @@ class EmailClient {
     this.isDarkTheme = false;
     this.ws = null;
     this.isLoggedIn = false;
+    this.isConnecting = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+    this.reconnectDelay = 1000;
 
     this.iconMap = {
       'email': 'fas fa-envelope',
@@ -28,36 +32,97 @@ class EmailClient {
   }
 
   connectWebSocket() {
-    this.ws = new WebSocket('ws://localhost:5173');
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      console.log('WebSocket already connected or connecting');
+      return;
+    }
 
-    this.ws.onopen = () => {
-      console.log('WebSocket connected');
-      this.requestSignupOptions();
-    };
+    this.isConnecting = true;
+    this.reconnectAttempts = this.reconnectAttempts || 0;
+    this.maxReconnectAttempts = 5;
+    this.reconnectDelay = 1000;
 
-    this.ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('WebSocket message:', data);
-
-        if (data.phpOutput && data.phpOutput.signupoptions) {
-          const signupData = data.phpOutput.signupoptions;
-          if (signupData.status === 'success' && signupData.signupoptions) {
-            this.displaySignupOptions(signupData.signupoptions);
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+    const connectionTimeout = setTimeout(() => {
+      if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+        console.log('WebSocket connection timeout');
+        this.ws.close();
+        this.handleConnectionError();
       }
-    };
+    }, 10000);
 
-    this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+    try {
+      this.ws = new WebSocket('ws://localhost:5173');
 
-    this.ws.onclose = () => {
-      console.log('WebSocket disconnected');
-    };
+      this.ws.onopen = () => {
+        clearTimeout(connectionTimeout);
+        console.log('WebSocket connected');
+        this.isConnecting = false;
+        this.reconnectAttempts = 0;
+        this.requestSignupOptions();
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('WebSocket message:', data);
+
+          if (data.phpOutput && data.phpOutput.signupoptions) {
+            const signupData = data.phpOutput.signupoptions;
+            if (signupData.status === 'success' && signupData.signupoptions) {
+              this.displaySignupOptions(signupData.signupoptions);
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        clearTimeout(connectionTimeout);
+        console.error('WebSocket error:', error);
+        this.handleConnectionError();
+      };
+
+      this.ws.onclose = () => {
+        clearTimeout(connectionTimeout);
+        console.log('WebSocket disconnected');
+        this.isConnecting = false;
+        this.attemptReconnect();
+      };
+    } catch (error) {
+      clearTimeout(connectionTimeout);
+      console.error('WebSocket connection error:', error);
+      this.handleConnectionError();
+    }
+  }
+
+  handleConnectionError() {
+    this.isConnecting = false;
+    if (!this.isLoggedIn) {
+      this.attemptReconnect();
+    }
+  }
+
+  attemptReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('Maximum reconnection attempts reached');
+      return;
+    }
+
+    if (this.isConnecting) {
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+
+    console.log(`Reconnecting in ${delay / 1000} seconds... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+
+    setTimeout(() => {
+      if (!this.isConnecting && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
+        this.connectWebSocket();
+      }
+    }, delay);
   }
 
   requestSignupOptions() {
@@ -67,8 +132,18 @@ class EmailClient {
       requestid: requestId
     };
 
+    this.sendJSON(message);
+  }
+
+  sendJSON(data) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message));
+      this.ws.send(JSON.stringify(data));
+      console.log('Sent:', data);
+    } else {
+      console.error('WebSocket not connected, readyState:', this.ws ? this.ws.readyState : 'null');
+      if (!this.isConnecting) {
+        this.attemptReconnect();
+      }
     }
   }
 
@@ -795,6 +870,11 @@ class EmailClient {
   logout() {
     this.closeUserDropdown();
     this.isLoggedIn = false;
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.close();
+      this.ws = null;
+    }
 
     document.getElementById('app').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'flex';
